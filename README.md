@@ -1,4 +1,4 @@
-# Cutie Hack Backend
+# CitrusHack Backend
 
 Backend for CitrusHack 2021, created using [Strapi](https://strapi.io).
 
