@@ -1,6 +1,6 @@
 # Cutie Hack Backend
 
-Backend for cutie hack 2021, created using [Strapi](https://strapi.io).
+Backend for CitrusHack 2021, created using [Strapi](https://strapi.io).
 
 ## Get started
 
@@ -9,8 +9,8 @@ You must have node and yarn installed.
 Clone the repository 
 
 ```bash
-git clone https://github.com/citrushack/CutieHack2021Backend.git
-cd CutieHack2021Backend
+git clone https://github.com/citrushack/CitrusHack2021Backend.git
+cd CitrusHack2021Backend
 ```
 
 ## Set up a free MongoDB atlas database
