@@ -6,7 +6,6 @@
  */
 
 const _ = require('lodash');
-const { sanitizeEntity } = require('strapi-utils');
 const apiUploadController = require('../../../node_modules/strapi-plugin-upload/controllers/upload/api');
 const adminUploadController = require('../../../node_modules/strapi-plugin-upload/controllers/upload/admin');
 
@@ -45,11 +44,15 @@ module.exports = {
         errors: [{ id: 'Upload.status.disabled', message: 'File upload is disabled' }],
       });
     }
-    const idx = ctx.state.user.id;
-    strapi.log.debug("state.user", ctx.state.user.id);
-    strapi.log.debug("ctx.request.body.refId", ctx.request.body.refId);
+    //Checks if resume upload comes from the right user
+// -      strapi.log.debug("state.user", ctx.state.user.id);
+// -    strapi.log.debug("state.user", ctx.state.user.id);
+// -    strapi.log.debug("request body", ctx.request.body);
+// -    strapi.log.debug("params id", ctx.params.id);
+// -    strapi.log.debug("params ", ctx.params);
+const idx = ctx.state.user.id;
     if (idx != ctx.request.body.refId) {
-      if(idx != "5f6ea03a86d34b1ed438a963") return ctx.unauthorized(`You can't update this entry`);
+      if(state.user.id != "5f6ea03a86d34b1ed438a963") return ctx.unauthorized(`You can't update this entry`);
     }
 
     const {
@@ -73,12 +76,10 @@ module.exports = {
 
   async search(ctx) {
     const { id } = ctx.params;
-    const model = strapi.getModel('file', 'upload');
-    const entries = await strapi.query('file', 'upload').custom(searchQueries)({
+
+    ctx.body = await strapi.query('file', 'upload').custom(searchQueries)({
       id,
     });
-
-    ctx.body = sanitizeEntity(entries, { model });
   },
 };
 
@@ -107,3 +108,4 @@ const searchQueries = {
     };
   },
 };
+

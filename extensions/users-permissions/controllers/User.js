@@ -6,10 +6,14 @@
  * @description: A set of functions called "actions" for managing `User`.
  */
 
-const has = require('lodash/has');
 const pick = require('lodash/pick');
 const some = require('lodash/some');
 const isEmpty = require('lodash/isEmpty');
+
+const every = require('lodash/every');
+const partial = require('lodash/partial');
+const has = require('lodash/has');
+
 const { sanitizeEntity } = require('strapi-utils');
 
 const sanitizeUser = user =>
@@ -26,6 +30,14 @@ const formatError = error => [
   { messages: [{ id: error.id, message: error.message, field: error.field }] },
 ];
 
+// Place all possible registration fields here
+const superSetRegisterValues = ['addr1', 'addr2', 'major', 'linkedin', 'github', 'extra', 'country', 'city', 'state', 'zip', 'firstname', 'lastname', 'gender', 'school', 'year'];
+// Place required registration fields here
+const requiredRegisterValues = ['addr1', 'major', 'country', 'city', 'state', 'zip', 'firstname', 'lastname', 'gender', 'school', 'year'];
+
+const validateRequest = req => every(requiredRegisterValues, partial(has, req));
+
+
 module.exports = {
 
   /**
@@ -34,103 +46,120 @@ module.exports = {
    */
   async updateme(ctx) {
     const advancedConfigs = await strapi
-      .store({
-        environment: '',
-        type: 'plugin',
-        name: 'users-permissions',
-        key: 'advanced',
-      })
-      .get();
+        .store({
+            environment: '',
+            type: 'plugin',
+            name: 'users-permissions',
+            key: 'advanced',
+        })
+        .get();
 
+    //Fetch the user's strapi state acoording to jwt
     const id = ctx.state.user.id;
-    //const { email, username, password } = ctx.request.body;
-
     const user = await strapi.plugins['users-permissions'].services.user.fetch({
-      id,
+        id,
     });
 
-    // if (has(ctx.request.body, 'email')) {
-    //   return ctx.badRequest('email.notAllowed');
-    // }
 
-    // if (has(ctx.request.body, 'username')) {
-    //   return ctx.badRequest('username.notAllowed');
-    // }
-
-    // if (has(ctx.request.body, 'password')) {
-    //   return ctx.badRequest('password.notAllowed');
-    // }
-
-    // if (!has(ctx.request.body, 'group')) return ctx.badRequest('OnlyGroupChangesAllowed');
+    //If the application is complete, only group changes are allowed
     if (!has(ctx.request.body, 'group') && user.appComplete) return ctx.badRequest('OnlyGroupChangesAllowed');
 
+    //If the application is not complete, register.
     if (!user.appComplete) {
-      const upData = pick(ctx.request.body, ['addr1', 'country', 'city', 'state', 'zip', 'firstname', 'lastname', 'gender', 'school', 'year']);
-   const notFinished = some(upData, isEmpty);
+        //Check if required values are present in request
+        strapi.log.debug("ctx.request.body ", ctx.request.body);
 
-        ['addr1', 'country', 'city', 'state', 'zip', 'firstname', 'lastname', 'gender', 'school', 'major', 'linkedin', 'github', 'year'].some(elm => {if(isEmpty(upData[elm])) return ctx.badRequest('MissingData')});
+        const isValid = validateRequest(ctx.request.body);
+        if (!isValid) return ctx.badRequest('NotFinished');
 
-    strapi.log.debug("upData ", upData);
-        if(notFinished) return ctx.badRequest('NotFinished');
+        //Pick superset of possible values from request to prevent 
+        //unwanted data manipulation
+        const upData = pick(ctx.request.body, superSetRegisterValues);
 
-      if(user){
-   try{
-      const response = await strapi.services.mailchimp.  request({
-        method: 'post',
-        path: '/lists/affb618484/members',
-        body: {
-          email_address: user.email,
-          status: "subscribed"
-        }
-      })
-      const { _links, ...res } = response;
-    }catch(err){
-     strapi.log.debug('status', err.status);
-      strapi.log.debug('body', err.detail);
-    }
-    }
-    const updatedPerson = await strapi.plugins['users-permissions'].services.user.edit({ id }, {...upData, appComplete : true});
-    if(!updatedPerson) return ctx.badRequest('CouldNotUpdatePerson');
-    let cleaned = sanitizeUser(updatedPerson);
-    return ctx.send(cleaned);
+        strapi.log.debug("upData ", upData);
 
+        if (user) {
+            try {
+                const response = await strapi.services.mailchimp.request({
+                    method: 'post',
+                    path: '/lists/affb618484/members',
+                    body: {
+                        email_address: user.email,
+                        status: "subscribed"
+                    }
+                })
+                const {
+                    _links,
+                    ...res
+                } = response;
+            } catch (err) {
+                strapi.log.debug('status', err.status);
+                strapi.log.debug('body', err.detail);
+            }
+        //Update application complete boolean
+        const updatedPerson = await strapi.plugins['users-permissions'].services.user.edit({
+            id
+        }, {
+            ...upData,
+            appComplete: true
+        });
+        if (!updatedPerson) return ctx.badRequest('CouldNotUpdatePerson');
+        let cleaned = sanitizeUser(updatedPerson);
+        return ctx.send(cleaned);
+      } else {
+        return ctx.badRequest('CouldNotFindUser');
+      }
     }
     //strapi.log.debug("updateData", user.group['id']);
-
-    if(ctx.request.body.group == 'none'){
-      if(!user.group) return ctx.badRequest('NotCurrentlyInGroup');
-      await strapi.plugins['users-permissions'].services.user.edit({ id }, {group: null});
-      return ctx.send({response : 'GroupLeft'});
+    
+    //If reached here, application is complete, group is in request data
+    if (ctx.request.body.group == 'none') {
+        if (!user.group) return ctx.badRequest('NotCurrentlyInGroup');
+        await strapi.plugins['users-permissions'].services.user.edit({
+            id
+        }, {
+            group: null
+        });
+        return ctx.send({
+            response: 'GroupLeft'
+        });
     }
 
-    const foundGroup = await strapi.query('group').findOne({ uid: ctx.request.body.group });
-    if(!foundGroup) return ctx.badRequest('CouldNotFindGroup');
+    const foundGroup = await strapi.query('group').findOne({
+        uid: ctx.request.body.group
+    });
+    
+    if (!foundGroup) return ctx.badRequest('CouldNotFindGroup');
 
 
-    if(has(foundGroup, 'users') && foundGroup.users.length > 3 ) return ctx.badRequest('GroupMaxSize');
+    if (has(foundGroup, 'users') && foundGroup.users.length > 3) return ctx.badRequest('GroupMaxSize');
 
-    //strapi.log.debug("groupSize", foundGroup.users.length);
+    const updateData = {
+        'group': foundGroup.id
+    };
 
-    const updateData =  {'group': foundGroup.id};
+    const updatedPerson = await strapi.plugins['users-permissions'].services.user.edit({
+        id
+    }, updateData);
+    if (!updatedPerson) return ctx.badRequest('CouldNotUpdatePerson');
 
-    const updatedPerson = await strapi.plugins['users-permissions'].services.user.edit({ id }, updateData);
-    if(!updatedPerson) return ctx.badRequest('CouldNotUpdatePerson');
-
-    const group = await strapi.query('group').findOne({ uid: ctx.request.body.group });
-    if(!group) return ctx.badRequest('CouldNotReturnGroup');
+    const group = await strapi.query('group').findOne({
+        uid: ctx.request.body.group
+    });
+    if (!group) return ctx.badRequest('CouldNotReturnGroup');
 
     let cleaned = sanitizeGroup(group);
 
-    if(has(cleaned, 'users') && cleaned.users.length ){
-      cleaned.users = cleaned.users.map(user => pick(user, ['firstname', 'lastname', 'id']));
+    if (has(cleaned, 'users') && cleaned.users.length) {
+        cleaned.users = cleaned.users.map(user => pick(user, ['firstname', 'lastname', 'id']));
     }
 
     return ctx.send(cleaned);
 
     //updateData = {...ctx.request.body};
-      // strapi.log.debug("updateData", updateData);
-      // strapi.log.debug("foundGroup", foundGroup);
-  },
+    // strapi.log.debug("updateData", updateData);
+    // strapi.log.debug("foundGroup", foundGroup);
+},
   async getMyGroup(ctx) {
     const advancedConfigs = await strapi
       .store({
