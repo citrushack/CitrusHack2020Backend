@@ -31,9 +31,9 @@ const formatError = error => [
 ];
 
 // Place all possible registration fields here
-const superSetRegisterValues = ['addr1', 'addr2', 'major', 'linkedin', 'github', 'extra', 'country', 'city', 'state', 'zip', 'firstname', 'lastname', 'gender', 'school', 'year'];
+const superSetRegisterValues = ['addr1', 'addr2', 'major', 'linkedin', 'github', 'extra', 'country', 'city', 'state', 'zip', 'firstname', 'lastname', 'gender', 'school', 'year', 'tshirt', 'phone', 'race', 'proudof', 'site', 'firsthackathon'];
 // Place required registration fields here
-const requiredRegisterValues = ['addr1', 'major', 'country', 'city', 'state', 'zip', 'firstname', 'lastname', 'gender', 'school', 'year'];
+const requiredRegisterValues = ['addr1', 'major', 'country', 'city', 'state', 'zip', 'firstname', 'lastname', 'gender', 'school', 'year', 'tshirt', 'phone'];
 
 const validateRequest = req => every(requiredRegisterValues, partial(has, req));
 
